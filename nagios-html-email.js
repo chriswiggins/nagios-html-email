@@ -25,7 +25,7 @@ var message;
 //We use collectd, and use the hostname variable followed by ARG1 which is the rest of the collectd path.
 //i.e collectd.web01.load.load.midterm
 //where $HOSTNAME$ = web01 and $ARG1$ = load.load.midterm
-var graphiteBaseUrl = 'http://10.101.8.12/render?width=800&from=-5minutes&until=now&target=collectd.'; //.$HOSTNAME$.$ARG1$
+var graphiteBaseUrl = 'http://10.101.8.12/render?width=800&from=-5minutes&until=now&target='; //.$HOSTNAME$.$ARG1$
 
 var package = require('./package');
 
@@ -194,9 +194,23 @@ if(errored){
 //If this is a graphite check command, go and get the graph
 if(data.nagios.SERVICECHECKCOMMAND && nagios.SERVICECHECKCOMMAND.indexOf('check_graphite_data') != -1){
 
+	//In our environment, we have two check commands. One where the whole graphite target is required,
+	//and one where all that is required is the part after [collectd.hostname.xxxxxx] where xxxx is passed as arg1 to the check command.
+	//i.e "check_graphite_data_custom!collectd.$HOSTNAME$.load.load.midterm!4!5!-r"
+	//or "check_graphite_data!load.load.midterm!4!5!-r"
+	var checkArgs = data.nagios.SERVICECHECKCOMMAND.split('!');
+
+	var url = graphiteBaseUrl;
+	if(checkArgs[1].indexOf('$HOSTNAME$') != -1){
+		url = url + checkArgs[1].replace('$HOSTNAME$', data.nagios.HOSTNAME);
+	}else{
+		url = url + 'collectd.' + data.nagios.HOSTNAME + '.' + checkArgs[1];
+	}
+
+
 	var requestSettings = {
 		method: 'GET',
-		url: graphiteBaseUrl + data.nagios.HOSTNAME + '.' + data.nagios.ARG1,
+		url: url,
 		encoding: null //Required to get raw buffer of the data
 	};
 
