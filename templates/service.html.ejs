@@ -34,6 +34,10 @@ var keys = [
 		<strong><%= nagios.HOSTALIAS.split('.')[0] %> <%= nagios.SERVICEDESC %></strong>
 		<br />
 		<br />
+		<% if (nagios.SERVICECHECKCOMMAND && nagios.SERVICECHECKCOMMAND.indexOf('check_graphite_data') != -1) { -%>
+		<img src="cid:graph@nagios.system"/>
+		<br />
+		<% } -%>
 		<pre style="font-size: 9pt"><%= nagios.SERVICEOUTPUT %></pre>
 		<br />
 <% if (nagios.NOTIFICATIONAUTHOR && nagios.NOTIFICATIONCOMMENT) { -%>

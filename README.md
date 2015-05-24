@@ -1,7 +1,8 @@
-Nagios HTML Email Template
+Nagios HTML Email Template plus Graphite Graphs!
 --------------------------
 
 Generate HTML emails for Nagios service and host alerts
+Modified by @chriswiggins to send embedded graphite graphs if the alert is generated from check_graphite_data
 
 - [Quick Start Guide](#quick-start-guide)
 - [Screenshots](#screenshots)
@@ -21,16 +22,16 @@ Install this package on your nagios server
 
     [sudo] npm install -g nagios-html-email
 
-And modify `commands.cfg` (or similar) to use this program
+And modify `commands.cfg` (or similar) to use this program. The script utilises nodemailer to send embedded attachments if required. 
 
 ``` bash
 define command {
     command_name notify-service-by-email
-    command_line nagios-html-email service http://nagios.example.com | mailx -t
+    command_line nagios-html-email service http://nagios.example.com
 }
 define command {
     command_name notify-host-by-email
-    command_line nagios-html-email host http://nagios.example.com | mailx -t
+    command_line nagios-html-email host http://nagios.example.com 
 }
 ```
 
@@ -243,7 +244,7 @@ use as command line arguments, and access them in your template as
 ``` bash
 define command {
     command_name notify-service-by-email
-    command_line nagios-html-email -s "** $NOTIFICATIONTYPE$ Service Alert: $HOSTALIAS$/$SERVICEDESC$ is $SERVICESTATE$ **" -a $CONTACTEMAIL$ service | mailx -t
+    command_line nagios-html-email -s "** $NOTIFICATIONTYPE$ Service Alert: $HOSTALIAS$/$SERVICEDESC$ is $SERVICESTATE$ **" -a $CONTACTEMAIL$ service
 }
 ```
 

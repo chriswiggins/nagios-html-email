@@ -4,7 +4,7 @@
  * and output raw email data suitable for passing to
  * something like `mailx -t`
  *
- * Author: Dave Eddy <dave@daveeddy.com>
+ * Authors: Dave Eddy <dave@daveeddy.com>, Chris Wiggins <chris@chriswiggins.co.nz>
  * Date: 2/3/2014
  * Licens: MIT
  */
@@ -15,6 +15,17 @@ var util = require('util');
 
 var ejs = require('ejs');
 var getopt = require('posix-getopt');
+var request = require('request');
+var nodemailer = require('nodemailer');
+var transporter = nodemailer.createTransport();
+var mailOptions = {};
+var message;
+
+//Modify this to your needs.
+//We use collectd, and use the hostname variable followed by ARG1 which is the rest of the collectd path.
+//i.e collectd.web01.load.load.midterm
+//where $HOSTNAME$ = web01 and $ARG1$ = load.load.midterm
+var graphiteBaseUrl = 'http://10.101.8.12/render?width=800&from=-5minutes&until=now&target=collectd.'; //.$HOSTNAME$.$ARG1$
 
 var package = require('./package');
 
@@ -34,6 +45,19 @@ function usage() {
     '  -u, --updates              check for available updates on npm',
     '  -v, --version              print the version number and exit',
   ].join('\n');
+}
+
+
+function sendEmail(){
+	mailOptions.html = message;
+	transporter.sendMail(mailOptions, function(error, info){
+	    if(error){
+	        console.log(error);
+	    }else{
+	        console.log('Message sent: ' + info.response);
+	    }
+		process.exit(0);
+	});
 }
 
 // command line arguments
@@ -126,22 +150,24 @@ if (!opts.subject) {
   }
 }
 
-// email headers
-console.log('To: %s', opts.to);
-console.log('Reply-To: %s', opts.to);
-console.log('Subject: %s', opts.subject);
-console.log('Content-Type: text/html');
-console.log();
+//Set the email options
+mailOptions.to = opts.to;
+mailOptions.replyTo = opts.to;
+mailOptions.from = 'Nagios Monitoring <nagios@securogroup.com>';
+mailOptions.subject = opts.subject;
 
-var message;
+var errored = false;
+
 // the message to be sent if something goes wrong
 // or if a template cannot be found.
 // it is just the JSON provided by the nagios daemon
 var templ = '<html><body><pre><%= d %></pre></body></html>';
+
 data.d = JSON.stringify(data, null, 2);
 try {
   message = ejs.render(templ, data);
 } catch (e) {
+  errored = true;
   message = util.format('error rendering default template!: %s', e.message);
   console.error(message);
 }
@@ -153,10 +179,42 @@ try {
   var templ = fs.readFileSync(templfile, 'utf-8');
   message = ejs.render(templ, data);
 } catch (e) {
+  errored = true;
   // if we are here, message will still be set from the above line
   // so don't overwrite it
   console.error('template %s error: %s', templfile, e.message);
 }
 
-// dump the message to stdout
-console.log(message);
+//If we've errored, send the email with the error message as the content.
+if(errored){
+	mailOptions.text = message;
+	return transporter.sendMail(mailOptions);
+}
+
+//If this is a graphite check command, go and get the graph
+if(data.nagios.SERVICECHECKCOMMAND && nagios.SERVICECHECKCOMMAND.indexOf('check_graphite_data') != -1){
+
+	var requestSettings = {
+		method: 'GET',
+		url: graphiteBaseUrl + data.nagios.HOSTNAME + '.' + data.nagios.ARG1,
+		encoding: null //Required to get raw buffer of the data
+	};
+
+	request(requestSettings, function(err, response, body){
+		if(err) return sendEmail();
+
+		mailOptions.attachments = [{
+			filename: 'graph.png',
+			content: body,
+			cid: 'graph@nagios.system'
+		}];
+
+		sendEmail();
+
+	});
+	
+}else{
+	sendEmail();
+}
+
+
